@@ -130,3 +130,6 @@ dmypy.json
 
 # Databases
 locations.list
+
+# Folium maps
+*_movies_map.html
