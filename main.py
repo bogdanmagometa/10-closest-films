@@ -5,7 +5,61 @@ The main module of the project for generating 10 closest locations of films shot
 In order to run user interface of the project, run this module.
 """
 
+import math
+from typing import Tuple
+
 import folium
+
+
+def haversin(arg: float) -> float:
+    """
+    Return haversine of the given argument. Argument should be given in radians.
+
+    >>> haversin(1)
+    0.22984884706593015
+    >>> haversin(-3.14)
+    0.9999993658637698
+    >>> haversin(1.552)
+    0.49060238999094163
+    >>> haversin(0)
+    0.0
+    """
+
+    return math.sin(arg/2)**2
+
+
+def calc_distance(location1: Tuple, location2: tuple) -> float:
+    """
+    Return the orthodromic distance (in km) between two points on Earth represented by tuples,
+    containing latitude and longitude, location1 and location2.
+
+    >>> calc_distance((139.74477, 35.6544), (39.8261, 21.4225))
+    10994.283880585657
+    >>> round(calc_distance((1, 1), (2, 2)))
+    157
+    >>> round(calc_distance((1.21, 32.1), (2, 89.5342)))
+    6384
+    >>> round(calc_distance((502.2, 502.2), (502.2, 502.2)))
+    0
+    >>> round(calc_distance((-26.6474403,-62.8121532), (-23.5459553,-48.9937375)))
+    1433
+    >>> round(calc_distance((-24.3766797,-64.1514063), (47.7116713,29.9257437)), -2)
+    12300.0
+    >>> round(calc_distance((70.1407185,-35.9671949), (-59.8096533,130.0329613)), -2)
+    18700.0
+    """
+
+    lat1, lon1 = map(lambda x: float(x)*math.pi/180, location1)
+    lat2, lon2 = map(lambda x: float(x)*math.pi/180, location2)
+
+    # radius of Earth in meters
+    earth_radius = 6_371
+
+    haver = haversin(lat1-lat2) + math.cos(lat1)*math.cos(lat2)*haversin(lon2-lon1)
+
+    dist = 2*earth_radius*math.asin(math.sqrt(haver))
+
+    return dist
 
 
 def generate_map(year: int, lat: float, lon: float) -> str:
@@ -15,7 +69,7 @@ def generate_map(year: int, lat: float, lon: float) -> str:
     name of the file.
     """
 
-    fol_map = folium.Map()
+    fol_map = folium.Map(location=[lat, lon], zoom_start=10)
 
     name_file = f"{year}_movies_map.html"
 
@@ -25,6 +79,9 @@ def generate_map(year: int, lat: float, lon: float) -> str:
 
 
 if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+
     year = int(input("Please enter a year you would like to have a map for: "))
     location = input("Please enter your location (format: lat, long): ")
     lat, lon = map(float, location.split(','))
