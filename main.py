@@ -6,9 +6,11 @@ In order to run user interface of the project, run this module.
 """
 
 import math
-from typing import Tuple
+from typing import Tuple, List
 
 import folium
+import pandas as pd
+from geopy.geocoders import Nominatim
 
 
 def haversin(arg: float) -> float:
@@ -52,7 +54,7 @@ def calc_distance(location1: Tuple, location2: tuple) -> float:
     lat1, lon1 = map(lambda x: float(x)*math.pi/180, location1)
     lat2, lon2 = map(lambda x: float(x)*math.pi/180, location2)
 
-    # radius of Earth in meters
+    # radius of Earth in kilometers
     earth_radius = 6_371
 
     haver = haversin(lat1-lat2) + math.cos(lat1)*math.cos(lat2)*haversin(lon2-lon1)
@@ -60,6 +62,28 @@ def calc_distance(location1: Tuple, location2: tuple) -> float:
     dist = 2*earth_radius*math.asin(math.sqrt(haver))
 
     return dist
+
+
+def get_coords_from_address(address: str) -> Tuple[float, float]:
+    """
+    Return coordinates (lattitude and longitude) of the place represented by a given address.
+    """
+
+    geocoder = Nominatim(user_agent="find_coords")
+    location = geocoder.geocode(address)
+
+    if location:
+        return location.latitude, location.longitude
+
+    return None
+
+
+def get_ten_closest(data: pd.DataFrame, coords) -> Tuple[str, Tuple[float, float]]:
+    """
+    Return 10 closest locations of films to the specified location.
+    """
+
+    pass
 
 
 def generate_map(year: int, lat: float, lon: float) -> str:
@@ -71,8 +95,12 @@ def generate_map(year: int, lat: float, lon: float) -> str:
 
     fol_map = folium.Map(location=[lat, lon], zoom_start=10)
 
-    name_file = f"{year}_movies_map.html"
+    fg_ten_closest = folium.FeatureGroup(name="10 closest locations of films")
 
+    data = pd.read_csv('locations.csv', header=None)
+    data = data[data[2] == year]
+
+    name_file = f"{year}_movies_map.html"
     fol_map.save(name_file)
 
     return name_file

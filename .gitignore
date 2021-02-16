@@ -128,8 +128,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Databases
-locations.list
-
 # Folium maps
 *_movies_map.html
+
+coords/
+.vscode/
