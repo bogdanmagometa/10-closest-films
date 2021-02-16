@@ -96,7 +96,7 @@ def get_coords_from_address(geocoder: Nominatim, address: str) -> Tuple[float, f
 def get_ten_closest(data: pd.DataFrame, coords, max_wait: float) \
                                                     -> List[Tuple[str, Tuple[float, float]]]:
     """
-    Return 10 films with closest location to the specified location.
+    Return at most 10 films with closest location to the specified location.
 
     data - DataFrame containing names of films, addresses and years of shooting.
     coords - coordinates of location, we need closest locations of films to.
