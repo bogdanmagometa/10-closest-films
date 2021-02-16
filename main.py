@@ -72,6 +72,14 @@ def calc_distance(location1: Tuple, location2: tuple) -> float:
 def get_coords_from_address(geocoder: Nominatim, address: str) -> Tuple[float, float]:
     """
     Return coordinates (lattitude and longitude) of the place represented by a given address.
+
+    >>> geocoder = Nominatim(user_agent="application_maps")
+    >>> get_coords_from_address(geocoder, "Нежухів")
+    (49.272354, 23.787224)
+    >>> get_coords_from_address(geocoder, "Hollywood, California, USA")
+    (34.0980031, -118.329523)
+    >>> get_coords_from_address(geocoder, "Richmond, British Columbia, Canada")
+    (49.163168, -123.137414)
     """
 
     try:
@@ -85,9 +93,14 @@ def get_coords_from_address(geocoder: Nominatim, address: str) -> Tuple[float, f
     return None
 
 
-def get_ten_closest(data: pd.DataFrame, coords, max_wait: float) -> List[Tuple[str, Tuple[float, float]]]:
+def get_ten_closest(data: pd.DataFrame, coords, max_wait: float) \
+                                                    -> List[Tuple[str, Tuple[float, float]]]:
     """
     Return 10 films with closest location to the specified location.
+
+    data - DataFrame containing names of films, addresses and years of shooting.
+    coords - coordinates of location, we need closest locations of films to.
+    max_wait - how much to wait for finding coordinates of addresses
     """
 
     data = data.sample(frac=1)
