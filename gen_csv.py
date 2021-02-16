@@ -1,3 +1,11 @@
+"""
+gen_csv.py
+
+Module for converting locations.list to locations.csv.
+
+To convert locations.list to locations.csv, run this module.
+"""
+
 import re
 import csv
 
