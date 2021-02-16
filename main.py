@@ -7,10 +7,14 @@ In order to run user interface of the project, run this module.
 
 import math
 from typing import Tuple, List
+import time
 
 import folium
+from folium.plugins import FloatImage
 import pandas as pd
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderUnavailable
+from urllib.request import urlretrieve
 
 
 def haversin(arg: float) -> float:
@@ -64,13 +68,16 @@ def calc_distance(location1: Tuple, location2: tuple) -> float:
     return dist
 
 
-def get_coords_from_address(address: str) -> Tuple[float, float]:
+def get_coords_from_address(geocoder: Nominatim, address: str) -> Tuple[float, float]:
     """
     Return coordinates (lattitude and longitude) of the place represented by a given address.
     """
 
-    geocoder = Nominatim(user_agent="find_coords")
-    location = geocoder.geocode(address)
+    try:
+        location = geocoder.geocode(address)
+    except GeocoderUnavailable:
+        print("Exception run! Uraaaa!")
+        return None
 
     if location:
         return location.latitude, location.longitude
@@ -78,12 +85,49 @@ def get_coords_from_address(address: str) -> Tuple[float, float]:
     return None
 
 
-def get_ten_closest(data: pd.DataFrame, coords) -> Tuple[str, Tuple[float, float]]:
+def get_ten_closest(data: pd.DataFrame, coords) -> List[Tuple[str, Tuple[float, float]]]:
     """
-    Return 10 closest locations of films to the specified location.
+    Return 10 films with closest location to the specified location.
     """
 
-    pass
+    data = data.sample(frac=1)
+
+    # time to wait in seconds
+    max_wait = 180
+
+    coords_dict = {}
+
+    start = time.time()
+    films = []
+
+    geocoder = Nominatim(user_agent="application_maps")
+
+    for _, row in data.iterrows():
+
+        if row[0] not in coords_dict:
+            print('\n\n\n\n')
+            print(row[2])
+            coords_dict[row[0]] = get_coords_from_address(geocoder, row[2])
+
+        film_location = coords_dict[row[0]]
+
+        if not film_location:
+            continue
+
+        dist = calc_distance(film_location, coords)
+
+        films.append((dist, (row[0], film_location)))
+
+        if (time.time() - start) > max_wait:
+            break
+        time.sleep(0.7)
+
+    try:
+        films.sort()
+    except:
+        print(*films, sep='\n')
+
+    return list(map(lambda x: x[1], films))[:10]
 
 
 def generate_map(year: int, lat: float, lon: float) -> str:
@@ -93,17 +137,71 @@ def generate_map(year: int, lat: float, lon: float) -> str:
     name of the file.
     """
 
-    fol_map = folium.Map(location=[lat, lon], zoom_start=10)
+    data = pd.read_csv('locations.csv', header=None)
+    data = data[data[1] == year]
 
+    fol_map = folium.Map(location=[lat, lon], zoom_start=10)
     fg_ten_closest = folium.FeatureGroup(name="10 closest locations of films")
 
-    data = pd.read_csv('locations.csv', header=None)
-    data = data[data[2] == year]
+    # ten_closest = get_ten_closest(data, (lat, lon))
+    print('ten_closest:')
+    # print(*ten_closest, sep='\n')
+
+    # for film in ten_closest:
+        # fg_ten_closest.add_child(folium.Marker(location=film[1], popup=film[0]))
+
+    fol_map.add_child(create_additional_layer('./world.json'))
+    fol_map.add_child(fg_ten_closest)
+    fol_map.add_child(folium.LayerControl())
 
     name_file = f"{year}_movies_map.html"
     fol_map.save(name_file)
 
     return name_file
+
+
+def create_additional_layer(path: str) -> folium.FeatureGroup:
+    """
+    Create and return feature group
+    """
+
+    urlretrieve('https://hub.jovian.ml/wp-content/uploads/2020/09/countries.csv', 'countries.csv')
+
+    data = pd.read_csv('countries.csv', usecols=['location', 'gdp_per_capita'])
+    data.set_index('location', inplace=True)
+
+    fg_gdp = folium.FeatureGroup(name='GDP per capita (09/2020)')
+
+    def style_func(x):
+        name = x['properties']['NAME']
+
+        quantile_25 = data['gdp_per_capita'].quantile(0.25)
+        quantile_50 = data['gdp_per_capita'].quantile(0.5)
+        quantile_75 = data['gdp_per_capita'].quantile(0.75)
+
+        try:
+            cur_gdp = data.loc[name, 'gdp_per_capita']
+        except KeyError:
+            return {'fillColor': 'white', 'fillOpacity': 1}
+
+        if cur_gdp < quantile_25:
+            return {'fillColor': 'black', 'fillOpacity': 1}
+        elif quantile_25 <= cur_gdp <= quantile_50:
+            return {'fillColor': 'red', 'fillOpacity': 1}
+        elif quantile_50 < cur_gdp <= quantile_75:
+            return {'fillColor': 'orange', 'fillOpacity': 1}
+        else:
+            return {'fillColor': 'green', 'fillOpacity': 1}
+
+    world_json = folium.GeoJson(data=open(path, 'r', encoding='utf-8-sig').read(),
+                                                            style_function=style_func)
+
+    image_fname = 'legend.png'
+
+    fg_gdp.add_child(FloatImage(image_fname, bottom=1.5, left=63))
+    fg_gdp.add_child(world_json)
+
+    return fg_gdp
 
 
 if __name__ == "__main__":
