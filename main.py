@@ -8,6 +8,7 @@ In order to run user interface of the project, run this module.
 import math
 from typing import Tuple, List
 import time
+import re
 
 import folium
 from folium.plugins import FloatImage
@@ -84,15 +85,12 @@ def get_coords_from_address(geocoder: Nominatim, address: str) -> Tuple[float, f
     return None
 
 
-def get_ten_closest(data: pd.DataFrame, coords) -> List[Tuple[str, Tuple[float, float]]]:
+def get_ten_closest(data: pd.DataFrame, coords, max_wait: float) -> List[Tuple[str, Tuple[float, float]]]:
     """
     Return 10 films with closest location to the specified location.
     """
 
     data = data.sample(frac=1)
-
-    # time to wait in seconds
-    max_wait = 180
 
     coords_dict = {}
 
@@ -128,7 +126,7 @@ def get_ten_closest(data: pd.DataFrame, coords) -> List[Tuple[str, Tuple[float, 
     return list(map(lambda x: x[1], films))[:10]
 
 
-def generate_map(year: int, lat: float, lon: float) -> str:
+def generate_map(year: int, lat: float, lon: float, max_wait: float) -> str:
     """
     Generate a map containing 10 closest locations of films shot in a given year to the specified
     location given by lat (lattitule) and lon (longitude). Save the map to html file. Return the
@@ -141,12 +139,17 @@ def generate_map(year: int, lat: float, lon: float) -> str:
     fol_map = folium.Map(location=[lat, lon], zoom_start=10)
     fg_ten_closest = folium.FeatureGroup(name="10 closest locations of films")
 
-    ten_closest = get_ten_closest(data, (lat, lon))
+    ten_closest = get_ten_closest(data, (lat, lon), max_wait)
     # print('ten_closest:')
     # print(*ten_closest, sep='\n')
 
+    fg_ten_closest.add_child(folium.Marker(location=[lat, lon], popup='This is your location',
+                                            icon=folium.Icon()))
+
     for film in ten_closest:
-        fg_ten_closest.add_child(folium.Marker(location=film[1], popup=film[0]))
+        fg_ten_closest.add_child(folium.CircleMarker(location=film[1], popup=film[0],
+                                                    color='magenta', fillColor='white',
+                                                    fillOpacity=0.5, icon=folium.Icon()))
 
     fol_map.add_child(create_additional_layer('./world.json', './legend.png', 'https://hub.jovian.ml/wp-content/uploads/2020/09/countries.csv'))
     fol_map.add_child(fg_ten_closest)
@@ -178,20 +181,20 @@ def create_additional_layer(path_geojson: str, path_to_leg: str, url_to_gdp_info
     def style_func(x):
         name = x['properties']['NAME']
 
-        quantile_25 = data['gdp_per_capita'].quantile(0.25)
-        quantile_50 = data['gdp_per_capita'].quantile(0.5)
-        quantile_75 = data['gdp_per_capita'].quantile(0.75)
+        percentile_25 = data['gdp_per_capita'].quantile(0.25)
+        percentile_50 = data['gdp_per_capita'].quantile(0.5)
+        percentile_75 = data['gdp_per_capita'].quantile(0.75)
 
         try:
             cur_gdp = data.loc[name, 'gdp_per_capita']
         except KeyError:
             return {'fillColor': 'white', 'fillOpacity': 0.7}
 
-        if cur_gdp < quantile_25:
+        if cur_gdp < percentile_25:
             return {'fillColor': 'black', 'fillOpacity': 0.7}
-        elif quantile_25 <= cur_gdp <= quantile_50:
+        elif percentile_25 <= cur_gdp <= percentile_50:
             return {'fillColor': 'red', 'fillOpacity': 0.7}
-        elif quantile_50 < cur_gdp <= quantile_75:
+        elif percentile_50 < cur_gdp <= percentile_75:
             return {'fillColor': 'orange', 'fillOpacity': 0.7}
         else:
             return {'fillColor': 'green', 'fillOpacity': 0.7}
@@ -213,9 +216,15 @@ if __name__ == "__main__":
     location = input("Please enter your location (format: lat, long): ")
     lat, lon = map(float, location.split(','))
 
+    max_wait = input("How much seconds do you want to wait (the more you wait, the better the results are)? ")
+
+    max_wait = max_wait.strip()
+    max_wait = re.sub('(seconds)|s', '', max_wait)
+    max_wait = int(max_wait.strip())
+
     print("Map is generating...")
     print("Please wait...")
 
-    file_name = generate_map(year, lat, lon)
+    file_name = generate_map(year, lat, lon, max_wait)
 
     print(f"Finished. Please have look at the map {file_name}")
