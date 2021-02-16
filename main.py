@@ -76,7 +76,6 @@ def get_coords_from_address(geocoder: Nominatim, address: str) -> Tuple[float, f
     try:
         location = geocoder.geocode(address)
     except GeocoderUnavailable:
-        print("Exception run! Uraaaa!")
         return None
 
     if location:
@@ -105,8 +104,6 @@ def get_ten_closest(data: pd.DataFrame, coords) -> List[Tuple[str, Tuple[float, 
     for _, row in data.iterrows():
 
         if row[0] not in coords_dict:
-            print('\n\n\n\n')
-            print(row[2])
             coords_dict[row[0]] = get_coords_from_address(geocoder, row[2])
 
         film_location = coords_dict[row[0]]
@@ -125,7 +122,8 @@ def get_ten_closest(data: pd.DataFrame, coords) -> List[Tuple[str, Tuple[float, 
     try:
         films.sort()
     except:
-        print(*films, sep='\n')
+        pass
+        # print(*films, sep='\n')
 
     return list(map(lambda x: x[1], films))[:10]
 
@@ -143,14 +141,14 @@ def generate_map(year: int, lat: float, lon: float) -> str:
     fol_map = folium.Map(location=[lat, lon], zoom_start=10)
     fg_ten_closest = folium.FeatureGroup(name="10 closest locations of films")
 
-    # ten_closest = get_ten_closest(data, (lat, lon))
-    print('ten_closest:')
+    ten_closest = get_ten_closest(data, (lat, lon))
+    # print('ten_closest:')
     # print(*ten_closest, sep='\n')
 
-    # for film in ten_closest:
-        # fg_ten_closest.add_child(folium.Marker(location=film[1], popup=film[0]))
+    for film in ten_closest:
+        fg_ten_closest.add_child(folium.Marker(location=film[1], popup=film[0]))
 
-    fol_map.add_child(create_additional_layer('./world.json'))
+    fol_map.add_child(create_additional_layer('./world.json', './legend.png', 'https://hub.jovian.ml/wp-content/uploads/2020/09/countries.csv'))
     fol_map.add_child(fg_ten_closest)
     fol_map.add_child(folium.LayerControl())
 
@@ -160,12 +158,17 @@ def generate_map(year: int, lat: float, lon: float) -> str:
     return name_file
 
 
-def create_additional_layer(path: str) -> folium.FeatureGroup:
+def create_additional_layer(path_geojson: str, path_to_leg: str, url_to_gdp_info: str) -> folium.FeatureGroup:
     """
-    Create and return feature group
+    Create and return feature group for gdp per capita
+
+    path_geojson is the path to GeoJSON file with polygons, representing territories of countries.
+    path_to_leg is the path to legend.
+    url_to_gdp_info is the url of the dataset containing information about countries (in particular,
+    gdp per capita)
     """
 
-    urlretrieve('https://hub.jovian.ml/wp-content/uploads/2020/09/countries.csv', 'countries.csv')
+    urlretrieve(url_to_gdp_info, 'countries.csv')
 
     data = pd.read_csv('countries.csv', usecols=['location', 'gdp_per_capita'])
     data.set_index('location', inplace=True)
@@ -182,23 +185,21 @@ def create_additional_layer(path: str) -> folium.FeatureGroup:
         try:
             cur_gdp = data.loc[name, 'gdp_per_capita']
         except KeyError:
-            return {'fillColor': 'white', 'fillOpacity': 1}
+            return {'fillColor': 'white', 'fillOpacity': 0.7}
 
         if cur_gdp < quantile_25:
-            return {'fillColor': 'black', 'fillOpacity': 1}
+            return {'fillColor': 'black', 'fillOpacity': 0.7}
         elif quantile_25 <= cur_gdp <= quantile_50:
-            return {'fillColor': 'red', 'fillOpacity': 1}
+            return {'fillColor': 'red', 'fillOpacity': 0.7}
         elif quantile_50 < cur_gdp <= quantile_75:
-            return {'fillColor': 'orange', 'fillOpacity': 1}
+            return {'fillColor': 'orange', 'fillOpacity': 0.7}
         else:
-            return {'fillColor': 'green', 'fillOpacity': 1}
+            return {'fillColor': 'green', 'fillOpacity': 0.7}
 
-    world_json = folium.GeoJson(data=open(path, 'r', encoding='utf-8-sig').read(),
+    world_json = folium.GeoJson(data=open(path_geojson, 'r', encoding='utf-8-sig').read(),
                                                             style_function=style_func)
 
-    image_fname = 'legend.png'
-
-    fg_gdp.add_child(FloatImage(image_fname, bottom=1.5, left=63))
+    fg_gdp.add_child(FloatImage(path_to_leg, bottom=1.5, left=63))
     fg_gdp.add_child(world_json)
 
     return fg_gdp
